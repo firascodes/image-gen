@@ -242,7 +242,7 @@ export default function PromptPage() {
                   spellCheck={false}
                 />
               </div>
-              <div className="flex items-center justify-between w-full space-x">
+              <div className="flex items-center justify-between w-full space-x flex-col lg:flex-row">
                 {/* Quantity Selector */}
                 <div className="space-y-2">
                   <Label>Number of Images</Label>

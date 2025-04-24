@@ -314,7 +314,7 @@ export default function ImagePage() {
           </div>
 
           {/* Style Selector */}
-          <div className="space-x-6 flex">
+          <div className="lg:space-x-6 flex flex-col lg:flex-row gap-6 lg:gap-0">
 
             <div className="space-y-2 max-w-2xl w-full">
               <Label htmlFor="prompt">Prompt</Label>
@@ -328,7 +328,7 @@ export default function ImagePage() {
                 />
             </div>
 
-            <div className="space-y-2 w-full max-w-sm flex flex-col  justify-center">
+            <div className="space-y-2 w-full max-w-sm flex flex-col justify-center lg:mt-4">
               <Label htmlFor="style-select">Select Style </Label>
               <Select value={selectedStyle} onValueChange={setSelectedStyle}>
                 <SelectTrigger id="style-select" className="w-full">
