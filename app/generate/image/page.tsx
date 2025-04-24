@@ -9,12 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download, ChevronLeft, Check, Copy, UploadCloud, X } from "lucide-react"; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; 
-import { openai } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
 import { calculateCost } from "@/lib/costUtils"; // Import cost calculation utility
 import Image from "next/image";
 import { useDropzone } from 'react-dropzone';
 import type { Image as OpenAIImage } from "openai/resources/images.mjs"; // Import the specific Image type
 import type { UsageDetails } from "@/lib/costUtils"; // Import UsageDetails type
+import { useToast } from "@/components/ui/toast-provider";
 
 // Define the expected API response structure including usage
 interface ApiResponseWithUsage {
@@ -41,6 +42,7 @@ function base64ToBlob(base64: string, contentType = '', sliceSize = 512): Blob {
 }
 
 export default function ImagePage() {
+  const { showToast } = useToast();
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [prompt, setPrompt] = useState("");
@@ -109,6 +111,17 @@ export default function ImagePage() {
   };
 
   const generateFromImages = async () => {
+    let openai;
+    try {
+      openai = getOpenAI();
+    } catch (err: any) {
+      showToast(
+        err?.message || 'Unknown error',
+        { variant: "error", position: "bottom-right" }
+      );
+      setLoading(false);
+      return;
+    }
     if (files.length === 0) return; 
     setLoading(true);
     setImageUrl(null); 
@@ -124,10 +137,12 @@ export default function ImagePage() {
       // Combine custom prompt with selected style
       const fullPrompt = (selectedStyle && selectedStyle !== 'none') ? `${prompt}, make it in a ${selectedStyle} style` : prompt;
 
-      const result: ApiResponseWithUsage = await openai.images.edit({
+      const result: ApiResponseWithUsage = await (openai.images.edit as any)({
         model: "gpt-image-1", 
         image: files[0], 
-        prompt: fullPrompt 
+        prompt: fullPrompt,
+        quality: "medium",
+        size: "1024x1024", 
       }) as ApiResponseWithUsage; // Cast response to include usage
 
       setApiResponse(result); 

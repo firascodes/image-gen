@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription }
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Download, ChevronLeft, Check, Copy, Plus, Minus, X } from "lucide-react";
-import { openai } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
+import { useToast } from "@/components/ui/toast-provider";
 import { calculateCost } from "@/lib/costUtils";
 import type { Image as OpenAIImage } from "openai/resources/images.mjs";
 import type { UsageDetails } from "@/lib/costUtils";
@@ -41,9 +42,11 @@ function base64ToBlob(base64: string, contentType = '', sliceSize = 512): Blob {
 }
 
 export default function PromptPage() {
+  const { showToast } = useToast();
   const [prompt, setPrompt] = useState('');
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [numberOfImages, setNumberOfImages] = useState(1);
+  const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploaded, setUploaded] = useState(false);
@@ -77,6 +80,17 @@ export default function PromptPage() {
   }, [loading]);
 
   const generateImage = async () => {
+    let openai;
+    try {
+      openai = getOpenAI();
+    } catch (err: any) {
+      showToast(
+        err?.message || 'Unknown error',
+        { variant: "error", position: "bottom-right" }
+      );
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setGeneratedImages([]);
     setApiResponse(null);
@@ -86,11 +100,12 @@ export default function PromptPage() {
     setCost(null);
 
     try {
-      const result: ApiResponseWithUsage = await openai.images.generate({
+      const result: ApiResponseWithUsage = await (openai.images.generate as any)({
         model: "gpt-image-1",
-        quality: "medium",
         prompt,
+        quality: quality,
         n: numberOfImages,
+        size: "1024x1024",
       }) as ApiResponseWithUsage;
 
       setApiResponse(result);
@@ -204,9 +219,13 @@ export default function PromptPage() {
         <ChevronLeft className="mr-2 h-4 w-4" /> Back to Home
       </Link>
 
-      <div className={`flex ${showResults ? 'flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6' : 'justify-center'}`}>
-        <div className={`${showResults ? 'flex-1 md:max-w-[50%]' : 'w-full max-w-2xl'}`}> 
-          <Card className="w-full h-full"> 
+      <div className={
+        showResults
+          ? 'flex  space-y-4 md:space-y-0 md:space-x-6'
+          : 'flex flex-col min-h-[60vh] items-center justify-center'
+      }>
+        <div className={`${showResults ? 'flex-1 md:max-w-[50%] flex flex-col' : 'w-full max-w-2xl'}`}> 
+          <Card className="w-full h-full min-h-[500px] flex flex-col"> 
             <CardHeader>
               <CardTitle className="text-2xl font-semibold text-center">Generate via Prompt</CardTitle>
               <CardDescription className="text-center">Enter a text prompt to generate an image</CardDescription>
@@ -223,28 +242,50 @@ export default function PromptPage() {
                   spellCheck={false}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Number of Images</Label>
-                <div className="flex items-center justify-between border rounded-md p-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => setNumberOfImages(prev => Math.max(1, prev - 1))} 
-                    disabled={numberOfImages <= 1 || loading}
-                  >
-                    <Minus className="h-4 w-4" />
-                  </Button>
-                  <span className="font-medium text-lg w-8 text-center">{numberOfImages}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => setNumberOfImages(prev => Math.min(4, prev + 1))} 
-                    disabled={numberOfImages >= 4 || loading}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
+              <div className="flex items-center justify-between w-full space-x">
+                {/* Quantity Selector */}
+                <div className="space-y-2">
+                  <Label>Number of Images</Label>
+                  <div className="flex items-center justify-between border rounded-md p-2 w-full">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setNumberOfImages(prev => Math.max(1, prev - 1))} 
+                      disabled={numberOfImages <= 1 || loading}
+                      >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="font-medium text-lg w-8 text-center">{numberOfImages}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setNumberOfImages(prev => Math.min(4, prev + 1))} 
+                      disabled={numberOfImages >= 4 || loading}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Quality Selector */}
+                <div className="space-y-2">
+                  <Label>Quality</Label>
+                  <div className="flex items-center justify-between border rounded-md p-2 gap-2">
+                    {['low', 'medium', 'high'].map((q) => (
+                      <Button
+                        key={q}
+                        type="button"
+                        variant={quality === q ? undefined : "ghost"}
+                        className={quality === q ? "bg-black text-white" : ""}
+                        onClick={() => setQuality(q as 'low' | 'medium' | 'high')}
+                        >
+                        {q.charAt(0).toUpperCase() + q.slice(1)}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
+
             </CardContent>
             <CardFooter>
               <Button 
@@ -258,14 +299,14 @@ export default function PromptPage() {
           </Card>
         </div>
 
-        <div className="flex-1 md:max-w-[50%] space-y-4">
+        <div className="flex-1 md:max-w-[50%] flex flex-col space-y-4">
           {loading && (
-            <Card>
+            <Card className="h-full min-h-[500px] flex flex-col"> 
               <CardHeader>
                 <CardTitle>Generating {numberOfImages} Image{numberOfImages > 1 ? 's' : ''}...</CardTitle>
               </CardHeader>
               <CardContent className="flex justify-center items-center">
-                <div className={`grid ${numberOfImages > 1 ? 'grid-cols-2 gap-4' : ''} p-4`}>
+                <div className={numberOfImages > 1 ? 'grid grid-cols-2 gap-4 p-4' : 'flex justify-center p-4'}>
                   {Array.from({ length: numberOfImages }).map((_, index) => (
                     <Skeleton key={index} className="h-[256px] w-[256px] rounded-md" /> 
                   ))}
@@ -275,12 +316,12 @@ export default function PromptPage() {
           )}
 
           {generatedImages.length > 0 && !loading && (
-            <Card>
+            <Card className="h-full min-h-[500px] flex flex-col"> 
               <CardHeader>
                 <CardTitle>Generated Image{generatedImages.length > 1 ? 's' : ''}</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={generatedImages.length > 1 ? 'grid grid-cols-2 gap-4' : 'flex justify-center'}>
                   {generatedImages.map((image, index) => (
                     <div key={index} className="flex flex-col items-center space-y-2 p-2 border rounded">
                       <img 
@@ -330,30 +371,35 @@ export default function PromptPage() {
       </div>
 
       {/* Preview Modal */}
-      {previewImageUrl && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4"
-          onClick={closePreview} 
-        >
-          <div 
-            className="relative max-w-full max-h-full"
-            onClick={(e) => e.stopPropagation()} 
-          >
-            <img 
-              src={previewImageUrl} 
-              alt="Preview" 
-              className="block max-w-full max-h-[90vh] object-contain rounded-md"
-            />
-            <button 
-              onClick={closePreview}
-              className="absolute top-2 right-2 text-white bg-black bg-opacity-50 rounded-full p-1 hover:bg-opacity-75 transition-colors"
-              aria-label="Close preview"
+      {previewImageUrl && typeof window !== 'undefined' &&
+        (typeof document !== 'undefined' ?
+          require('react-dom').createPortal(
+            <div 
+              className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4"
+              onClick={closePreview} 
+              style={{ margin: 0 }}
             >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-        </div>
-      )}
+              <div 
+                className="relative max-w-full max-h-full"
+                onClick={(e) => e.stopPropagation()} 
+              >
+                <img 
+                  src={previewImageUrl} 
+                  alt="Preview" 
+                  className="block max-w-full max-h-[90vh] object-contain rounded-md"
+                />
+                <button 
+                  onClick={closePreview}
+                  className="absolute top-2 right-2 text-white bg-black bg-opacity-50 rounded-full p-1 hover:bg-opacity-75 transition-colors"
+                  aria-label="Close preview"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>,
+            document.body
+          ) : null)
+      }
     </div>
   );
 }

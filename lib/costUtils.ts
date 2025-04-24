@@ -29,8 +29,6 @@ export function calculateCost(usage: UsageDetails): number {
   cost += (imageInputTokens / 1_000_000) * IMAGE_INPUT_COST_PER_MILLION;
   cost += (outputTokens / 1_000_000) * OUTPUT_COST_PER_MILLION;
 
-  // Note: This calculation assumes the usage object is from a model like GPT-4 Vision.
-  // It does NOT include separate image generation costs (like DALL-E).
 
   return cost;
 }
