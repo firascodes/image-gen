@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { openai } from "@/lib/openai";
+import { getOpenAI } from "@/lib/openai";
 
 export async function POST(req: NextRequest) {
   const { prompt } = await req.json();
   try {
-    const result = await openai.images.generate({
+    const result = await (getOpenAI().images.generate as any)({
       model: "gpt-image-1",
       prompt,
     });
